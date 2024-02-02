@@ -18,7 +18,7 @@ prompt = "How can I create a class in Java that represents a celestial body, and
 
 test_data_path = r"./data/test_data.json"
 test_tps_path = r"./data/test_tps.json"
-test_responses_path = r"./data/test_responses.json"
+test_responses_path = r"./data/test_responses.txt"
 llm_path = r"E:\LLM"
 
 def test_llamacpp_model(model_path: str):
@@ -56,4 +56,4 @@ def parse_test():
         print(f"{file:45} | Average tps:{tps:.3f}")
 
 if __name__ == "__main__":
-    parse_test()
+    test_llamacpp_model(r"C:\Users\Lex\Downloads\RWKV-v5-Eagle-World-7B-v2-20240128-ctx4096.pth")
