@@ -44,8 +44,8 @@ class LLMTester:
     def run(self, *args, **kwargs) -> None:
         self._test_cache.append(self.llm.run(*args, **kwargs))
 
-    def run_n(self, run_n: int, *args, **kwargs) -> None:
-        for _ in range(run_n):
+    def run_n(self, run_count: int, *args, **kwargs) -> None:
+        for _ in range(run_count):
             self.run(*args, **kwargs)
 
     def to_dict(self) -> dict[str, Any]:

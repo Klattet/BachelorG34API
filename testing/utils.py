@@ -1,36 +1,60 @@
-import json
-from typing import Any
-
-from haystack_integrations.components.generators.llama_cpp import LlamaCppGenerator
+import traceback, sys, gc, json
+from typing import Generator, Any
 
 from lib import LLM
 from testing import LLMTester
 
-__all__ = "test_llama_cpp_n", "test_llama_cpp_n_dump", "parse_tokens_per_second"
+__all__ = "test_model_dump", "test_models_dump", "parse_tps", "print_sorted_tps", "parse_responses", "print_responses"
 
-def _test_llama_cpp_n(prompt_template: str, prompt: str, run_n: int, *args, **kwargs) -> LLMTester:
-    generator = LlamaCppGenerator(*args, **kwargs)
-    llm = LLM.from_generator(generator)
+def test_model_dump(llm: LLM, dump_path: str, prompt_template: str, prompt: str, run_count: int) -> None:
+    try:
+        tester = LLMTester(llm)
+        tester.run_n(run_count, prompt_template, prompt)
+        tester.dump_all(dump_path)
+    except Exception:
+        print(traceback.format_exc(), file = sys.stderr)
 
-    tester = LLMTester(llm)
-    tester.run_n(run_n, prompt_template, prompt)
+def test_models_dump(llm_generator: Generator[LLM, None, None], dump_path: str, prompt_template: str, prompt: str, run_count: int):
+    for llm in llm_generator:
+        test_model_dump(llm, dump_path, prompt_template, prompt, run_count)
+        gc.collect()
 
-    return tester
+def parse_tps(data_path: str) -> dict[str, float]:
+    with open(data_path, "r") as file:
+        data_dict: dict[str, Any] = json.load(file)
 
-def test_llama_cpp_n(prompt_template: str, prompt: str, run_n: int, *args, **kwargs) -> dict[str, Any]:
-    return _test_llama_cpp_n(prompt_template, prompt, run_n, *args, **kwargs).to_dict()
+    tps_dict: dict[str, float] = {}
 
-def test_llama_cpp_n_dump(prompt_template: str, prompt: str, run_n: int, dump_path: str, *args, **kwargs) -> None:
-    _test_llama_cpp_n(prompt_template, prompt, run_n, *args, **kwargs).dump(dump_path)
+    for model, results in data_dict.items():
+        tps_dict[model] = sum(result["token_count"] / result["generation_time"] for result in results) / len(results)
 
-def parse_tokens_per_second(file_path: str) -> list[tuple[str, float]]:
-    with open(file_path, "r") as file:
-        test_data: dict[str, Any] = json.load(file)
+    return tps_dict
 
-    result: list[tuple[str, float]] = []
-    for file_name, responses in test_data.items():
-        data_length = len(responses)
-        tps_sum = sum(response["token_count"] / response["generation_time"] for response in responses)
-        result.append((file_name, tps_sum / data_length))
+def print_sorted_tps(tps_data: dict[str, float]) -> None:
 
-    return result
+    sorted_tps: list[tuple[str, Any]] = sorted(((k, v) for k, v in tps_data.items()), key = lambda e: e[1], reverse = True)
+
+    for model, tps in sorted_tps:
+        print(f"{model:50} | Average tps: {tps:.3f}")
+
+def parse_responses(data_path: str) -> dict[str, list[str]]:
+    with open(data_path, "r") as file:
+        data_dict: dict[str, Any] = json.load(file)
+
+    response_dict: dict[str, list[str]] = {}
+
+    for model, results in data_dict.items():
+        response_dict[model] = []
+        for result in results:
+            response_dict[model].append(result["response"])
+
+    return response_dict
+
+def print_responses(response_data: dict[str, list[str]]) -> None:
+    for model, responses in response_data.items():
+        print(f"{model}:")
+        for num, response in enumerate(responses, start = 1):
+            print(f"\tResponse {num}:")
+            for line in response.splitlines():
+                print(f"\t\t{line}")
+        print()

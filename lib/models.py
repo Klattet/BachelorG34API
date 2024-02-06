@@ -1,8 +1,9 @@
-from typing import Any, Self
+from typing import Any, Self, Sequence
 from abc import abstractmethod, ABCMeta
 from dataclasses import dataclass
 from time import perf_counter
 
+from haystack.dataclasses import Document
 from haystack.components.builders import PromptBuilder
 from haystack_integrations.components.generators.llama_cpp import LlamaCppGenerator
 
@@ -88,11 +89,11 @@ class LLamaCpp(LLM):
     def run(self, prompt_template: str, prompt: str, generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
 
         prompt_builder = PromptBuilder(prompt_template)
-        new_prompt = prompt_builder.run(prompt = prompt)["prompt"]
+        new_prompt: str = prompt_builder.run(prompt = prompt)["prompt"]
 
-        start = perf_counter()
-        result = self.generator.run(new_prompt, generation_kwargs)
-        stop = perf_counter()
+        start: float = perf_counter()
+        result: dict[str, list] = self.generator.run(new_prompt, generation_kwargs)
+        stop: float = perf_counter()
 
         return LLMResult(
             prompt = prompt,
@@ -106,3 +107,26 @@ class LLamaCpp(LLM):
             #model_kwargs = dict((f, getattr(self.generator.model.model_params, f)) for f, _ in self.generator.model.model_params._fields_),
             #generation_kwargs = dict((f, getattr(self.generator.model.context_params, f)) for f, _ in self.generator.model.context_params._fields_)
         )
+
+    def run_with_docs(self, prompt_template: str, prompt: str, documents: Sequence[Document], generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
+
+        prompt_builder = PromptBuilder(prompt_template)
+        new_prompt: str = prompt_builder.run(prompt = prompt, documents = documents)["prompt"]
+
+        start: float = perf_counter()
+        result: dict[str, list] = self.generator.run(new_prompt, generation_kwargs)
+        stop: float = perf_counter()
+
+        return LLMResult(
+            prompt = prompt,
+            response = result["replies"][0],
+            token_count = result["meta"][0]["usage"]["completion_tokens"],
+            generation_time = stop - start,
+            stop_reason = result["meta"][0]["choices"][0]["finish_reason"]
+
+            # llm_path = result["meta"][0]["model"],
+            # llm_type = self.__class__,
+            # model_kwargs = dict((f, getattr(self.generator.model.model_params, f)) for f, _ in self.generator.model.model_params._fields_),
+            # generation_kwargs = dict((f, getattr(self.generator.model.context_params, f)) for f, _ in self.generator.model.context_params._fields_)
+        )
+
