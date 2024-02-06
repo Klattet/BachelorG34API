@@ -67,6 +67,16 @@ class LLM(metaclass = ABCMeta):
         """
         ...
 
+    @abstractmethod
+    def run_with_docs(self, prompt_template: str, prompt: str, documents: Sequence[Document], generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
+        """
+        prompt_template: A string that uses the Jinja2 formatting like in Haystack. {{prompt}} marks the location of the prompt input.
+        prompt: The prompt input in pure text.
+        documents: The documents to include in the prompt.
+        generation_kwargs: The specific model's generation keyword arguments.
+        """
+        ...
+
 class LLamaCpp(LLM):
 
     __slots__ = "generator", "model_path"
