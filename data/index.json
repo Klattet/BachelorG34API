@@ -1,0 +1,20 @@
+{
+  "Programmering 2": [
+    {
+      "keywords": [
+        "class",
+        "interface"
+      ],
+      "location": "link til noe",
+      "location_type": "local"
+    },
+    {
+      "keywords": [
+        "function",
+        "method"
+      ],
+      "location": "link til noe",
+      "location_type": "website"
+    }
+  ]
+}

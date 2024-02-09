@@ -25,7 +25,6 @@ class LLMResult:
     #generation_kwargs: dict[str, Any]
 
 
-
 type SupportedGenerator = (
     LlamaCppGenerator
 )
