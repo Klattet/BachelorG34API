@@ -5,6 +5,8 @@ from typing import Self
 from jsonschema import Draft202012Validator
 from haystack.dataclasses import Document
 
+__all__ = "Database",
+
 class LocationType(StrEnum):
     FILE = "file"
     DIRECTORY = "directory"
