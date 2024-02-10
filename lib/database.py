@@ -1,17 +1,16 @@
 import json
-from enum import Enum
-from typing import Any, Self
-from pprint import pprint
-from dataclasses import dataclass
+from enum import StrEnum
+from typing import Self
 
-from jsonschema import validate, Draft202012Validator
+from jsonschema import Draft202012Validator
 from haystack.dataclasses import Document
 
-class LocationType(Enum):
-    LOCAL = "local"
+class LocationType(StrEnum):
+    FILE = "file"
+    DIRECTORY = "directory"
     WEBSITE = "website"
 
-# Desc
+# Description of a valid layout of information in the index json file. Used to validate while loading.
 index_schema = {
     "type": "object",
     "patternProperties": {
@@ -30,7 +29,7 @@ index_schema = {
                         "type": "string"
                     },
                     "location_type": {
-                        "enum": [location_type.value for location_type in LocationType]
+                        "enum": list(LocationType)
                     }
                 },
                 "required": [
@@ -44,25 +43,31 @@ index_schema = {
     },
     "additionalProperties": False
 }
+Draft202012Validator.check_schema(index_schema)
+index_validator = Draft202012Validator(index_schema)
 
-@dataclass(slots = True)
 class Link:
     """
     Represents a link between a collection of keywords and a file containing some text.
     """
 
-    keywords: list[str]
-    location: str
-    type: LocationType
+    __slots__ = "keywords", "location", "location_type"
+
+    def __init__(self, keywords: list[str], location: str, location_type: LocationType) -> None:
+        self.keywords: list[str] = keywords
+        self.location: str = location
+        self.location_type: LocationType = location_type
 
     def read_document(self) -> Document:
-        match self.type:
-            case LocationType.LOCAL:
+        match self.location_type:
+            case LocationType.FILE:
                 with open(self.location, "r") as file:
                     return Document(
                         id = self.location,
                         content = file.read()
                     )
+            case LocationType.DIRECTORY:
+                raise NotImplemented()
             case LocationType.WEBSITE:
                 raise NotImplemented()
             case _:
@@ -71,14 +76,19 @@ class Link:
     def match_keywords(self, text: str) -> bool:
         return any(word in self.keywords for word in text.split())
 
-
-@dataclass(slots = True)
 class Subject:
-    name: str
-    links: list[Link]
+    """
+    Represents a subject that has links to relevant subject information.
+    """
+
+    __slots__ = "name", "links"
+
+    def __init__(self, name: str, links: list[Link]) -> None:
+        self.name: str = name
+        self.links: list[Link] = links
 
     @classmethod
-    def from_links(cls, name: str, data: list[dict[str, str | list]]) -> Self:
+    def from_raw_links(cls, name: str, data: list[dict[str, str | list]]) -> Self:
         links: list[Link] = []
         for link in data:
             links.append(Link(link["keywords"], link["location"], LocationType(link["location_type"])))
@@ -87,42 +97,35 @@ class Subject:
         return self
 
 class Database:
+    """
+    Represents a simple database that can fetch documents for use with haystack.
+    """
+
+    __slots__ = "index_path", "subjects"
+
     def __init__(self, index_path: str) -> None:
         self.index_path: str = index_path
-        self.data: list[Subject] = []
+        self.subjects: list[Subject] = []
         self.update_data()
 
     def update_data(self) -> None:
         with open(self.index_path, "r") as file:
             index_data: dict[str, list] = json.load(file)
 
-        if not self.verify_data(index_data):
-            return
+        index_validator.validate(index_data)
 
-        self.data = [
-            Subject.from_links(subject_name, links)
+        self.subjects = [
+            Subject.from_raw_links(subject_name, links)
             for subject_name, links in index_data.items()
         ]
 
-    @staticmethod
-    def verify_data(data: dict) -> bool:
-        Draft202012Validator.check_schema(index_schema)
-        validator = Draft202012Validator(index_schema)
-        return validator.is_valid(data)
-
     def fetch_relevant_documents(self, subject_name: str, text: str) -> list[Document]:
-        for subject in self.data:
+        for subject in self.subjects:
             if subject.name == subject_name:
-                result: list[Document] = []
-                for link in subject.links:
-                    if link.match_keywords(text):
-                        result.append(link.read_document())
-                return result
+                return [
+                    link.read_document()
+                    for link in subject.links
+                    if link.match_keywords(text)
+                ]
         else:
             raise ValueError(f"{subject_name} is not a valid subject name.")
-
-
-
-db = Database("../data/index.json")
-
-print(db.fetch_relevant_documents("Programmering 2", "Tell me how to make a class in java."))
