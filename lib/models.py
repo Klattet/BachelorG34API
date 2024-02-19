@@ -6,6 +6,8 @@ from time import perf_counter
 from haystack.dataclasses import Document
 from haystack.components.builders import PromptBuilder
 from haystack_integrations.components.generators.llama_cpp import LlamaCppGenerator
+from haystack.document_stores.in_memory import InMemoryDocumentStore
+from haystack.components.retrievers.in_memory import InMemoryBM25Retriever
 
 __all__ = "LLMResult", "LLM", "LLamaCpp"
 
@@ -76,6 +78,16 @@ class LLM(metaclass = ABCMeta):
         """
         ...
 
+    @abstractmethod
+    def run_with_bm25(self, prompt_template: str, prompt: str, document_store: InMemoryDocumentStore, document_count: int = 3, generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
+        """
+        prompt_template: A string that uses the Jinja2 formatting like in Haystack. {{prompt}} marks the location of the prompt input.
+        prompt: The prompt input in pure text.
+        document_store: In memory document store to search for relevant info in.
+        generation_kwargs: The specific model's generation keyword arguments.
+        """
+        ...
+
 class LLamaCpp(LLM):
 
     __slots__ = "generator", "model_path"
@@ -139,3 +151,29 @@ class LLamaCpp(LLM):
             # generation_kwargs = dict((f, getattr(self.generator.model.context_params, f)) for f, _ in self.generator.model.context_params._fields_)
         )
 
+    def run_with_bm25(self, prompt_template: str, prompt: str, document_store: InMemoryDocumentStore, document_count: int = 3, generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
+
+        document_retriever = InMemoryBM25Retriever(document_store)
+        relevant_documents: list[Document] = document_retriever.run(query = prompt, top_k = document_count)["documents"]
+
+        #print(relevant_documents[0].id)
+
+        prompt_builder = PromptBuilder(prompt_template)
+        new_prompt: str = prompt_builder.run(prompt = prompt, documents = relevant_documents)["prompt"]
+
+        start: float = perf_counter()
+        result: dict[str, list] = self.generator.run(new_prompt, generation_kwargs)
+        stop: float = perf_counter()
+
+        return LLMResult(
+            prompt = prompt,
+            response = result["replies"][0],
+            token_count = result["meta"][0]["usage"]["completion_tokens"],
+            generation_time = stop - start,
+            stop_reason = result["meta"][0]["choices"][0]["finish_reason"]
+
+            # llm_path = result["meta"][0]["model"],
+            # llm_type = self.__class__,
+            # model_kwargs = dict((f, getattr(self.generator.model.model_params, f)) for f, _ in self.generator.model.model_params._fields_),
+            # generation_kwargs = dict((f, getattr(self.generator.model.context_params, f)) for f, _ in self.generator.model.context_params._fields_)
+        )
