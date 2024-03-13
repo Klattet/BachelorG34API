@@ -34,6 +34,18 @@ supported_generators: tuple[type] = (
     LlamaCppGenerator,
 )
 
+def run_generator(llm_generator: SupportedGenerator,
+                  prompt_message: str,
+                  prompt_template: str | None = None,
+                  generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
+    ...
+
+def run_with_docs(prompt_template: str, prompt_message: str, generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
+    ...
+
+def run_with_bm25(prompt_template: str, prompt_message: str, generation_kwargs: dict[str, Any] | None = None) -> LLMResult:
+    ...
+
 class LLM(metaclass = ABCMeta):
     """
     A metaclass that other LLM wrappers must inherit from.
