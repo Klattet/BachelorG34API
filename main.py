@@ -23,7 +23,7 @@ Answer: \
 prompt = "How can I create a class in Java that represents a celestial body, and create subclasses that represent things like planets and moons?"
 
 document_directory: str
-llm_path: str
+llm_path: str = "D:/LLM/orca-2-7b.Q4_K_M.gguf"
 
 def main() -> None:
 
@@ -49,5 +49,20 @@ def main() -> None:
 
     print(result.response)
 
+def main2() -> None:
+
+    llm = LLamaCpp(llm_path, model_kwargs = {"n_gpu_tokens": -1, "n_ctx": 500})
+
+    result: LLMResult = llm.run(
+        prompt_template = prompt_template,
+        prompt = prompt,
+        generation_kwargs = {"max_tokens": 300}
+    )
+
+
+    print(result.prompt)
+
+    print(result.response)
+
 if __name__ == "__main__":
-    main()
+    main2()
