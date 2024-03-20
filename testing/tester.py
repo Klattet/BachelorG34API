@@ -1,7 +1,7 @@
 import dataclasses, os, json
 from typing import Any
 
-from lib import LLM, LLMResult
+from lib import LLM, StaticResult, StreamResult
 
 __all__ = "LLMTester",
 
@@ -16,13 +16,13 @@ class LLMTester:
     def __init__(self, llm: LLM) -> None:
         self.llm: LLM = llm
 
-        self._test_cache: list[LLMResult] = []
+        self._test_cache: list[StaticResult | StreamResult] = []
 
     def reset(self) -> None:
         self._test_cache.clear()
 
     @property
-    def test_cache(self) -> list[LLMResult]:
+    def test_cache(self) -> list[StaticResult | StreamResult]:
         return self._test_cache
 
     @property
@@ -31,7 +31,7 @@ class LLMTester:
 
     @property
     def responses(self) -> tuple[str, ...]:
-        return tuple(result.response for result in self._test_cache)
+        return tuple(result.response_text for result in self._test_cache)
 
     @property
     def tokens_per_second(self) -> tuple[float, ...]:
